@@ -1,4 +1,4 @@
-function [pr, pay, delta, bond, opt] = american_option(S0, type, K, r, h,u, d, T)
+function [pr, payoff, delta, bond, opt] = american_option_dividend(S0, euro, type, K, r, h,u, d, T, D, div)
     periods = T;
     prices = zeros(periods+1, periods+1);
     payoffs = zeros(periods+1, periods +1);
@@ -8,24 +8,33 @@ function [pr, pay, delta, bond, opt] = american_option(S0, type, K, r, h,u, d, T
     b = zeros(periods, periods);
     opt_pos = [];
     for i = (periods+1):-1:1
+        n = sum(D <= i);
         for j = 1: i
-            prices(j,i) = S0 * u^(i-j)*d^(j-1);
+            prices(j,i) = S0 * u^(i-j)*d^(j-1)*(1 - div)^n;
             if i == periods+1
                 %initialize final payoff
                 if strcmp(type,'call')
                     payoffs(j,i) = max([prices(j,i)-K, 0]);
                 elseif strcmp(type, 'put')
                     payoffs(j,i) = max([-prices(j,i)+K, 0]);
+                elseif strcmp(type, 'straddle')
+                    payoffs(j,i) = max([-prices(j,i)+K, prices(j,i)-K]);
                 end
             else
                 p_no(j,i) = exp(-r*h)* (payoffs(j,i+1)*(exp(r*h)-d)/(u-d) +payoffs(j+1,i+1)*(u-exp(r*h))/(u-d));
-                
+              
                 if strcmp(type,'call')
                     p_ex(j,i) = max([prices(j,i)-K, 0]);
                 elseif strcmp(type, 'put')
                     p_ex(j,i) = max([-prices(j,i)+K, 0]);
+                elseif strcmp(type, 'straddle')
+                    p_ex(j,i) = max([-prices(j,i)+K, prices(j,i)-K]);
                 end
-                payoffs(j,i) = max([p_no(j,i), p_ex(j,i)]);
+                if strcmp(euro, 'E')
+                    payoffs(j,i) = p_no(j,i);
+                else
+                    payoffs(j,i) = max([p_no(j,i), p_ex(j,i)]);
+                end
                 if p_ex(j,i) > p_no(j,i)
                     opt_pos = [opt_pos; [j,i]];
                 end
@@ -35,7 +44,7 @@ function [pr, pay, delta, bond, opt] = american_option(S0, type, K, r, h,u, d, T
         end
     end
     pr = prices;
-    pay = payoffs;
+    payoff = payoffs;
     delta = del;
     bond = b;
     opt = opt_pos;
